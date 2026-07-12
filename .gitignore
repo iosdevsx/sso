@@ -1,0 +1,5 @@
+.env
+config/local.yaml
+.vscode/
+.agents/
+.codex/
