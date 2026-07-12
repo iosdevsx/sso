@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net"
 	"os"
 
 	"github.com/iosdevsx/sso/internal/config"
+	"github.com/iosdevsx/sso/internal/grpc/auth"
 	"github.com/iosdevsx/sso/internal/storage/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 const (
@@ -33,6 +38,18 @@ func main() {
 	defer dbpool.Close()
 
 	logger.Info("Storage initialized", slog.String("env", cfg.Env))
+
+	grpcServer := grpc.NewServer()
+	auth.Register(grpcServer, nil)
+	reflection.Register(grpcServer)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+
+	if err != nil {
+		logger.Error("listener failed", "error", err)
+		os.Exit(1)
+	}
+
+	grpcServer.Serve(listener)
 }
 
 func setupLogger(env string) *slog.Logger {
