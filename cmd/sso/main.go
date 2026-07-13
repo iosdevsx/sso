@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/iosdevsx/sso/internal/app/sl"
 	"github.com/iosdevsx/sso/internal/config"
 	"github.com/iosdevsx/sso/internal/grpc/auth"
 	"github.com/iosdevsx/sso/internal/storage/migrations"
@@ -30,9 +31,9 @@ func main() {
 	logger.Debug("debug messages are enabled")
 
 	// Initialize storage
-	dbpool, err := setupStorage(logger, ctx, cfg)
+	dbpool, err := setupStorage(ctx, cfg)
 	if err != nil {
-		logger.Error("db run failed", "error", err)
+		logger.Error("db run failed", sl.Err(err))
 		os.Exit(1)
 	}
 	defer dbpool.Close()
@@ -45,7 +46,7 @@ func main() {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 
 	if err != nil {
-		logger.Error("listener failed", "error", err)
+		logger.Error("listener failed", sl.Err(err))
 		os.Exit(1)
 	}
 
@@ -75,9 +76,8 @@ func setupLogger(env string) *slog.Logger {
 	return logger
 }
 
-func setupStorage(log *slog.Logger, ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+func setupStorage(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	dbUrl := cfg.DBServer.DatabaseURL()
-	log.Info(dbUrl)
 	err := migrations.Run(dbUrl)
 
 	if err != nil {
