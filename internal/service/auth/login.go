@@ -9,6 +9,10 @@ import (
 	"github.com/iosdevsx/sso/internal/lib/jwt"
 )
 
+const (
+	timingAttackHash = "$argon2id$v=19$m=19456,t=2,p=1$h1VS32QZKcCcUSmecuW0kw$NEfuIr2Q/iijA+W0CVWhIBNr/Z4/qH5okr69vNZ22Uk"
+)
+
 func (s *Service) Login(ctx context.Context, email, password string) (string, error) {
 	const operation = "service.auth.login"
 	//canonical email
@@ -26,10 +30,14 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, er
 	//get user
 	model, err := s.userStorage.GetUser(ctx, canonicalEmail)
 	if errors.Is(err, errs.ErrUserNotFound) {
+		//fake verify with err handling for prevent timing attack
+		s.passHasher.Verify(normalizedPass, timingAttackHash)
 		return "", fmt.Errorf("%s: %w", operation, errs.ErrInvalidCredentials)
 	}
 
 	if err != nil {
+		//fake verify with err handling for prevent timing attack
+		s.passHasher.Verify(normalizedPass, timingAttackHash)
 		return "", fmt.Errorf("%s: %w", operation, err)
 	}
 

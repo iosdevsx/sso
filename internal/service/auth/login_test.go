@@ -37,13 +37,17 @@ type verifierFake struct {
 	returnErr   error
 	gotPassword string
 	gotHash     string
+	verifyCalls int
+	hashCalls   int
 }
 
 func (f *verifierFake) Hash(password string) (string, error) {
+	f.hashCalls++
 	return "", nil
 }
 
 func (f *verifierFake) Verify(password string, hash string) (bool, error) {
+	f.verifyCalls++
 	f.gotPassword = password
 	f.gotHash = hash
 	return f.returnOK, f.returnErr
@@ -71,6 +75,9 @@ func TestService_Login_Success(t *testing.T) {
 	}
 	if verifier.gotHash != "stored-phc-hash" {
 		t.Fatalf("Verify got hash %q, want stored hash", verifier.gotHash)
+	}
+	if verifier.hashCalls != 0 {
+		t.Fatalf("Hash calls = %d, want 0: Login не должен хешировать (timing-заглушка — константа)", verifier.hashCalls)
 	}
 
 	parsed, err := jwtlib.Parse(
@@ -107,38 +114,44 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 		name          string
 		email         string
 		password      string
-		repoUser      models.User
-		repoErr       error
-		verifyOK      bool
-		wantRepoCalls int
+		repoUser        models.User
+		repoErr         error
+		verifyOK        bool
+		wantRepoCalls   int
+		wantVerifyCalls int
 	}{
 		{
 			name:     "user not found",
 			email:    "ghost@test.com",
 			password: validPass,
 			repoErr:  errs.ErrUserNotFound,
-			// не найден и неверный пароль снаружи неразличимы
-			wantRepoCalls: 1,
+			// не найден и неверный пароль снаружи неразличимы,
+			// в том числе по времени: dummy-Verify обязателен
+			wantRepoCalls:   1,
+			wantVerifyCalls: 1,
 		},
 		{
-			name:          "wrong password",
-			email:         "test@test.com",
-			password:      validPass,
-			repoUser:      models.User{ID: 8, PassHash: "stored-phc-hash"},
-			verifyOK:      false,
-			wantRepoCalls: 1,
+			name:            "wrong password",
+			email:           "test@test.com",
+			password:        validPass,
+			repoUser:        models.User{ID: 8, PassHash: "stored-phc-hash"},
+			verifyOK:        false,
+			wantRepoCalls:   1,
+			wantVerifyCalls: 1,
 		},
 		{
-			name:          "invalid email short-circuits before repo",
-			email:         "user@localhost",
-			password:      validPass,
-			wantRepoCalls: 0,
+			name:            "invalid email short-circuits before repo",
+			email:           "user@localhost",
+			password:        validPass,
+			wantRepoCalls:   0,
+			wantVerifyCalls: 0,
 		},
 		{
-			name:          "short password short-circuits before repo",
-			email:         "test@test.com",
-			password:      strings.Repeat("a", 11),
-			wantRepoCalls: 0,
+			name:            "short password short-circuits before repo",
+			email:           "test@test.com",
+			password:        strings.Repeat("a", 11),
+			wantRepoCalls:   0,
+			wantVerifyCalls: 0,
 		},
 	}
 
@@ -158,6 +171,12 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 			}
 			if repo.calls != tt.wantRepoCalls {
 				t.Fatalf("GetUser calls = %d, want %d", repo.calls, tt.wantRepoCalls)
+			}
+			if verifier.verifyCalls != tt.wantVerifyCalls {
+				t.Fatalf("Verify calls = %d, want %d", verifier.verifyCalls, tt.wantVerifyCalls)
+			}
+			if verifier.hashCalls != 0 {
+				t.Fatalf("Hash calls = %d, want 0", verifier.hashCalls)
 			}
 		})
 	}
