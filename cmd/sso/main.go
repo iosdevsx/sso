@@ -7,10 +7,14 @@ import (
 	"net"
 	"os"
 
-	"github.com/iosdevsx/sso/internal/app/sl"
 	"github.com/iosdevsx/sso/internal/config"
-	"github.com/iosdevsx/sso/internal/grpc/auth"
+	authgrpc "github.com/iosdevsx/sso/internal/grpc/auth"
+	"github.com/iosdevsx/sso/internal/lib/hasher"
+	"github.com/iosdevsx/sso/internal/lib/sl"
+	authservice "github.com/iosdevsx/sso/internal/service/auth"
+	"github.com/iosdevsx/sso/internal/service/providers"
 	"github.com/iosdevsx/sso/internal/storage/migrations"
+	"github.com/iosdevsx/sso/internal/storage/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -40,8 +44,13 @@ func main() {
 
 	logger.Info("Storage initialized", slog.String("env", cfg.Env))
 
+	storage := postgres.NewStorage(dbpool)
+	hasher := hasher.New()
+	appProvider := providers.New()
 	grpcServer := grpc.NewServer()
-	auth.Register(grpcServer, nil)
+	service := authservice.NewService(logger, storage, hasher, appProvider, 0)
+
+	authgrpc.Register(logger, grpcServer, service)
 	reflection.Register(grpcServer)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 
@@ -81,23 +90,24 @@ func setupStorage(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error
 	err := migrations.Run(dbUrl)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("migrations run failed: %w", err)
 	}
 
 	dbConfig, err := pgxpool.ParseConfig(dbUrl)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse config failed: %w", err)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pool creation failed: %w", err)
 	}
 
 	if err := pool.Ping(ctx); err != nil {
-		return nil, err
+		pool.Close()
+		return nil, fmt.Errorf("pool ping failed: %w", err)
 	}
 
 	return pool, nil
