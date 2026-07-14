@@ -12,7 +12,6 @@ import (
 	"github.com/iosdevsx/sso/internal/lib/hasher"
 	"github.com/iosdevsx/sso/internal/lib/sl"
 	authservice "github.com/iosdevsx/sso/internal/service/auth"
-	"github.com/iosdevsx/sso/internal/service/providers"
 	"github.com/iosdevsx/sso/internal/storage/migrations"
 	"github.com/iosdevsx/sso/internal/storage/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,6 +33,8 @@ func main() {
 	logger.Info("starting sso", slog.String("env", cfg.Env))
 	logger.Debug("debug messages are enabled")
 
+	logger.Info("auth config", slog.Duration("ttl", cfg.Auth.TokenTTL), slog.Int("secret_len", len(cfg.Auth.TokenSecret)))
+
 	// Initialize storage
 	dbpool, err := setupStorage(ctx, cfg)
 	if err != nil {
@@ -46,9 +47,8 @@ func main() {
 
 	storage := postgres.NewStorage(dbpool)
 	hasher := hasher.New()
-	appProvider := providers.New()
 	grpcServer := grpc.NewServer()
-	service := authservice.NewService(logger, storage, hasher, appProvider, 0)
+	service := authservice.NewService(logger, storage, hasher, cfg.Auth.TokenTTL, cfg.Auth.TokenSecret)
 
 	authgrpc.Register(logger, grpcServer, service)
 	reflection.Register(grpcServer)

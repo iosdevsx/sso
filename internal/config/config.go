@@ -12,9 +12,10 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Env      string     `yaml:"env"`
-	GRPC     GRPCConfig `yaml:"grpc_server"`
-	DBServer DBServer   `yaml:"db_server"`
+	Env      string      `yaml:"env"`
+	GRPC     GRPCConfig  `yaml:"grpc_server"`
+	DBServer DBServer    `yaml:"db_server"`
+	Auth     TokenConfig `yaml:"auth"`
 }
 
 type GRPCConfig struct {
@@ -31,6 +32,11 @@ type DBServer struct {
 	Password     string `yaml:"password" env:"SSO_POSTGRES_PASSWORD"`
 	DatabaseName string `yaml:"database_name" env:"SSO_POSTGRES_DB"`
 	SSLMode      string `yaml:"sslmode"`
+}
+
+type TokenConfig struct {
+	TokenTTL    time.Duration `yaml:"token_ttl"`
+	TokenSecret string        `env:"SSO_TOKEN_SECRET"`
 }
 
 func MustLoad() *Config {
