@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/iosdevsx/sso/internal/domain/errs"
+	"github.com/iosdevsx/sso/internal/domain/models"
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -47,4 +49,27 @@ func (s *Storage) SaveUser(ctx context.Context, email string, passHash string) (
 	}
 
 	return userID, nil
+}
+
+func (s *Storage) GetUser(ctx context.Context, email string) (models.User, error) {
+	const operation = "storage.postgres.getUser"
+	const query = `
+		select id, email, pass_hash from users where email = $1
+	`
+	var user models.User
+	err := s.pool.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.PassHash,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.User{}, fmt.Errorf("%s: %w", operation, errs.ErrUserNotFound)
+	}
+
+	if err != nil {
+		return models.User{}, fmt.Errorf("%s: %w", operation, err)
+	}
+
+	return user, nil
 }

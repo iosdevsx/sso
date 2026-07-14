@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/iosdevsx/sso/internal/domain/errs"
+	"github.com/iosdevsx/sso/internal/domain/models"
 )
 
-type userSaverFake struct {
+type userRepositoryFake struct {
 	returnID    int64
 	calls       int
 	gotEmail    string
@@ -18,11 +19,15 @@ type userSaverFake struct {
 	returnErr   error
 }
 
-func (f *userSaverFake) SaveUser(ctx context.Context, email string, passHash string) (userID int64, err error) {
+func (f *userRepositoryFake) SaveUser(ctx context.Context, email string, passHash string) (userID int64, err error) {
 	f.calls++
 	f.gotEmail = email
 	f.gotPassHash = passHash
 	return f.returnID, f.returnErr
+}
+
+func (f *userRepositoryFake) GetUser(ctx context.Context, email string) (models.User, error) {
+	return models.User{}, nil
 }
 
 type userHasherFake struct {
@@ -45,14 +50,14 @@ func (f *userHasherFake) Verify(password string, hash string) (bool, error) {
 
 func TestService_Register_Success(t *testing.T) {
 	//Arrange
-	fake := &userSaverFake{
+	fake := &userRepositoryFake{
 		returnID: 42,
 	}
 	hasher := &userHasherFake{
 		returnHash: "fake-phc-hash",
 	}
 	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, nil, 0,
+		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
 	)
 	email := "test@test.com"
 	password := "test_password"
@@ -98,14 +103,14 @@ func TestService_RegisterInvalidEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake := &userSaverFake{
+			fake := &userRepositoryFake{
 				returnID: 42,
 			}
 			hasher := &userHasherFake{
 				returnHash: "fake-phc-hash",
 			}
 			service := NewService(
-				slog.New(slog.DiscardHandler), fake, hasher, nil, 0,
+				slog.New(slog.DiscardHandler), fake, hasher, 0, "",
 			)
 			gotUserID, err := service.Register(context.Background(), tt.email, tt.password)
 			if err == nil {
@@ -123,14 +128,14 @@ func TestService_RegisterInvalidEmail(t *testing.T) {
 
 func TestService_Register_UserAlreadyExists(t *testing.T) {
 	//Arrange
-	fake := &userSaverFake{
+	fake := &userRepositoryFake{
 		returnErr: errs.ErrUserExists,
 	}
 	hasher := &userHasherFake{
 		returnHash: "fake-phc-hash",
 	}
 	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, nil, 0,
+		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
 	)
 	email := "test@test.com"
 	password := "test_password"
@@ -154,12 +159,12 @@ func TestService_Register_UserAlreadyExists(t *testing.T) {
 
 func TestService_Register_PasswordTooLong(t *testing.T) {
 	//Arrange
-	fake := &userSaverFake{}
+	fake := &userRepositoryFake{}
 	hasher := &userHasherFake{
 		returnHash: "fake-phc-hash",
 	}
 	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, nil, 0,
+		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
 	)
 	email := "test@test.com"
 	password := strings.Repeat("a", 129)
@@ -181,12 +186,12 @@ func TestService_Register_PasswordTooLong(t *testing.T) {
 
 func TestService_Register_PasswordTooShort(t *testing.T) {
 	//Arrange
-	fake := &userSaverFake{}
+	fake := &userRepositoryFake{}
 	hasher := &userHasherFake{
 		returnHash: "fake-phc-hash",
 	}
 	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, nil, 0,
+		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
 	)
 	email := "test@test.com"
 	password := strings.Repeat("a", 11)

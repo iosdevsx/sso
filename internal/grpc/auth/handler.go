@@ -21,6 +21,7 @@ type handler struct {
 
 type Auth interface {
 	Register(ctx context.Context, email, password string) (userID int64, err error)
+	Login(ctx context.Context, email, password string) (string, error)
 }
 
 func Register(logger *slog.Logger, grpcServer *grpc.Server, authService Auth) {
@@ -47,4 +48,18 @@ func (s *handler) Register(ctx context.Context, request *ssov1.RegisterRequest) 
 	return &ssov1.RegisterResponse{
 		UserId: userId,
 	}, nil
+}
+
+func (s *handler) Login(ctx context.Context, request *ssov1.LoginRequest) (*ssov1.LoginResponse, error) {
+	token, err := s.authService.Login(ctx, request.Email, request.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, errs.ErrInvalidCredentials):
+			return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+		default:
+			s.logger.Error("internal server error", sl.Err(err))
+			return nil, status.Error(codes.Internal, "internal server error")
+		}
+	}
+	return &ssov1.LoginResponse{Token: token}, nil
 }
