@@ -25,10 +25,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (models.Tok
 	}
 
 	//canonical pass
-	normalizedPass, err := normalizePassword(password)
-	if err != nil {
-		return models.Tokens{}, errs.Wrap(operation, errs.ErrInvalidCredentials)
-	}
+	normalizedPass := normalizePassword(password)
 
 	//get user
 	model, err := s.userStorage.GetUser(ctx, canonicalEmail)
@@ -49,8 +46,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (models.Tok
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}
 
+	validatedPass, err := validatePassword(normalizedPass)
+	if err != nil {
+		return models.Tokens{}, errs.Wrap(operation, errs.ErrInvalidCredentials)
+	}
+
 	//check creds
-	ok, err := s.passHasher.Verify(normalizedPass, model.PassHash)
+	ok, err := s.passHasher.Verify(validatedPass, model.PassHash)
 	if err != nil {
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}

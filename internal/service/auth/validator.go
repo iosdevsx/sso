@@ -43,14 +43,17 @@ func canonicalizeEmail(email string) (string, error) {
 	return addr, nil
 }
 
-func normalizePassword(password string) (string, error) {
-	password = norm.NFC.String(password)
-	count := utf8.RuneCountInString(password)
+func normalizePassword(password string) string {
+	return norm.NFC.String(password)
+}
+
+func validatePassword(normalizedPassword string) (string, error) {
+	count := utf8.RuneCountInString(normalizedPassword)
 	if count < 12 {
 		return "", errs.ErrPasswordTooShort
 	}
 	if count > 128 {
 		return "", errs.ErrPasswordTooLong
 	}
-	return password, nil
+	return normalizedPassword, nil
 }

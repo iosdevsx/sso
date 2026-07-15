@@ -81,7 +81,8 @@ func Test_ValidatePassword_Valid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pass, err := normalizePassword(tt.input)
+			normalizedPass := normalizePassword(tt.input)
+			pass, err := validatePassword(normalizedPass)
 			if pass == "" {
 				t.Fatalf("test failed, got %s, want %s", pass, tt.want)
 			}
@@ -107,7 +108,8 @@ func Test_ValidatePassword_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pass, err := normalizePassword(tt.input)
+			normalizedPass := normalizePassword(tt.input)
+			pass, err := validatePassword(normalizedPass)
 			if pass != "" {
 				t.Fatalf("test failed, got %s, want %s", pass, tt.want)
 			}

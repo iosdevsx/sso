@@ -123,7 +123,7 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 			name:            "short password short-circuits before repo",
 			email:           "test@test.com",
 			password:        strings.Repeat("a", 11),
-			wantRepoCalls:   0,
+			wantRepoCalls:   1,
 			wantVerifyCalls: 0,
 		},
 	}

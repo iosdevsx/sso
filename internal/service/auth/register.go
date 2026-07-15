@@ -14,13 +14,14 @@ func (service *Service) Register(ctx context.Context, email, password string) (i
 		return 0, errs.Wrap(operation, err)
 	}
 
-	normalizedPass, err := normalizePassword(password)
+	normalizedPass := normalizePassword(password)
+	validatedPass, err := validatePassword(normalizedPass)
 	if err != nil {
 		return 0, errs.Wrap(operation, err)
 	}
 
 	// захешировать пароль
-	passHash, err := service.passHasher.Hash(normalizedPass)
+	passHash, err := service.passHasher.Hash(validatedPass)
 	if err != nil {
 		return 0, errs.Wrap(operation, err)
 	}
