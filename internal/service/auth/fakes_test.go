@@ -12,13 +12,18 @@ import (
 // Единственное место, которое нужно править при смене конструктора.
 func newTestService(storage *storageFake, hasher *hasherFake, tokenTTL time.Duration, secret string, refreshTTL time.Duration) *Service {
 	return NewService(ServiceParams{
-		Log:             slog.New(slog.DiscardHandler),
-		UserStorage:     storage,
-		TokenStorage:    storage,
-		PassHasher:      hasher,
-		TokenTTL:        tokenTTL,
-		TokenSecret:     secret,
-		RefreshTokenTTL: refreshTTL,
+		Log:                  slog.New(slog.DiscardHandler),
+		UserStorage:          storage,
+		TokenStorage:         storage,
+		LoginAttemptsStorage: storage,
+		PassHasher:           hasher,
+		AuthParams: AuthParams{
+			TokenTTL:        tokenTTL,
+			TokenSecret:     secret,
+			RefreshTokenTTL: refreshTTL,
+			MaxAttempts:     5,
+			LockDuration:    time.Hour,
+		},
 	})
 }
 
@@ -51,6 +56,37 @@ type storageFake struct {
 	consumeErr     error
 	consumeCalls   int
 	gotConsumeHash string
+
+	// CheckAccountLock
+	checkLockTime  *time.Time
+	checkLockErr   error
+	checkLockCalls int
+
+	// IncrementFailedLoginAttempt
+	incrementLockTime  *time.Time
+	incrementErr       error
+	incrementCalls     int
+	gotIncrementUserID int64
+
+	// ResetAccountAttempts
+	resetErr   error
+	resetCalls int
+}
+
+func (f *storageFake) CheckAccountLock(ctx context.Context, userID int64) (*time.Time, error) {
+	f.checkLockCalls++
+	return f.checkLockTime, f.checkLockErr
+}
+
+func (f *storageFake) IncrementFailedLoginAttempt(ctx context.Context, userID int64, maxAttempts int, lockUntil time.Time) (*time.Time, error) {
+	f.incrementCalls++
+	f.gotIncrementUserID = userID
+	return f.incrementLockTime, f.incrementErr
+}
+
+func (f *storageFake) ResetAccountAttempts(ctx context.Context, userID int64) error {
+	f.resetCalls++
+	return f.resetErr
 }
 
 func (f *storageFake) SaveUser(ctx context.Context, email string, passHash string) (int64, error) {

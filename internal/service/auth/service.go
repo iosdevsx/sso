@@ -18,41 +18,52 @@ type TokenStorage interface {
 	ConsumeRefreshToken(ctx context.Context, tokenHash string) (int64, error)
 }
 
+type LoginAttemptsStorage interface {
+	ResetAccountAttempts(ctx context.Context, userID int64) error
+	CheckAccountLock(ctx context.Context, userID int64) (*time.Time, error)
+	IncrementFailedLoginAttempt(ctx context.Context, userID int64, maxAttempts int, lockUntil time.Time) (*time.Time, error)
+}
+
 type PassHasher interface {
 	Hash(password string) (string, error)
 	Verify(password string, hash string) (bool, error)
 }
 
 type ServiceParams struct {
-	Log             *slog.Logger
-	UserStorage     UserStorage
-	TokenStorage    TokenStorage
-	PassHasher      PassHasher
+	Log                  *slog.Logger
+	UserStorage          UserStorage
+	TokenStorage         TokenStorage
+	LoginAttemptsStorage LoginAttemptsStorage
+	PassHasher           PassHasher
+	AuthParams           AuthParams
+}
+
+type AuthParams struct {
 	TokenTTL        time.Duration
 	TokenSecret     string
 	RefreshTokenTTL time.Duration
+	MaxAttempts     int
+	LockDuration    time.Duration
 }
 
 type Service struct {
-	log             *slog.Logger
-	userStorage     UserStorage
-	tokenStorage    TokenStorage
-	passHasher      PassHasher
-	tokenTTL        time.Duration
-	tokenSecret     string
-	refreshTokenTTL time.Duration
+	log                  *slog.Logger
+	userStorage          UserStorage
+	tokenStorage         TokenStorage
+	loginAttemptsStorage LoginAttemptsStorage
+	passHasher           PassHasher
+	authParams           AuthParams
 }
 
 func NewService(
 	params ServiceParams,
 ) *Service {
 	return &Service{
-		log:             params.Log,
-		userStorage:     params.UserStorage,
-		tokenStorage:    params.TokenStorage,
-		passHasher:      params.PassHasher,
-		tokenTTL:        params.TokenTTL,
-		tokenSecret:     params.TokenSecret,
-		refreshTokenTTL: params.RefreshTokenTTL,
+		log:                  params.Log,
+		userStorage:          params.UserStorage,
+		tokenStorage:         params.TokenStorage,
+		loginAttemptsStorage: params.LoginAttemptsStorage,
+		passHasher:           params.PassHasher,
+		authParams:           params.AuthParams,
 	}
 }

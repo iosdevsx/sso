@@ -32,14 +32,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (models.Toke
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}
 
-	exp := time.Now().Add(s.refreshTokenTTL)
+	exp := time.Now().Add(s.authParams.RefreshTokenTTL)
 	err = s.tokenStorage.SaveRefreshToken(ctx, userID, hashRefreshToken, exp)
 
 	if err != nil {
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}
 
-	accessToken, err := jwt.NewToken(userID, s.tokenTTL, s.tokenSecret)
+	accessToken, err := jwt.NewToken(userID, s.authParams.TokenTTL, s.authParams.TokenSecret)
 
 	if err != nil {
 		return models.Tokens{}, errs.Wrap(operation, err)

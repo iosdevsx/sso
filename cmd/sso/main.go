@@ -51,13 +51,18 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	service := authservice.NewService(authservice.ServiceParams{
-		Log:             logger,
-		UserStorage:     storage,
-		TokenStorage:    storage,
-		PassHasher:      hasher,
-		TokenTTL:        cfg.Auth.TokenTTL,
-		TokenSecret:     cfg.Auth.TokenSecret,
-		RefreshTokenTTL: cfg.Auth.RefreshTokenTTL,
+		Log:                  logger,
+		UserStorage:          storage,
+		TokenStorage:         storage,
+		LoginAttemptsStorage: storage,
+		PassHasher:           hasher,
+		AuthParams: authservice.AuthParams{
+			TokenTTL:        cfg.Auth.TokenTTL,
+			TokenSecret:     cfg.Auth.TokenSecret,
+			RefreshTokenTTL: cfg.Auth.RefreshTokenTTL,
+			MaxAttempts:     cfg.Auth.MaxAttempts,
+			LockDuration:    cfg.Auth.LockoutDuration,
+		},
 	})
 
 	authgrpc.Register(logger, grpcServer, service)
