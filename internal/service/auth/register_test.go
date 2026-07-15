@@ -3,62 +3,21 @@ package auth
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/iosdevsx/sso/internal/domain/errs"
-	"github.com/iosdevsx/sso/internal/domain/models"
 )
-
-type userRepositoryFake struct {
-	returnID    int64
-	calls       int
-	gotEmail    string
-	gotPassHash string
-	returnErr   error
-}
-
-func (f *userRepositoryFake) SaveUser(ctx context.Context, email string, passHash string) (userID int64, err error) {
-	f.calls++
-	f.gotEmail = email
-	f.gotPassHash = passHash
-	return f.returnID, f.returnErr
-}
-
-func (f *userRepositoryFake) GetUser(ctx context.Context, email string) (models.User, error) {
-	return models.User{}, nil
-}
-
-type userHasherFake struct {
-	calls       int
-	gotPassHash string
-	returnHash  string
-	returnErr   error
-}
-
-func (f *userHasherFake) Hash(password string) (string, error) {
-	f.calls++
-	return f.returnHash, f.returnErr
-}
-
-func (f *userHasherFake) Verify(password string, hash string) (bool, error) {
-	f.calls++
-	f.gotPassHash = hash
-	return f.gotPassHash == f.returnHash, f.returnErr
-}
 
 func TestService_Register_Success(t *testing.T) {
 	//Arrange
-	fake := &userRepositoryFake{
-		returnID: 42,
+	fake := &storageFake{
+		saveUserID: 42,
 	}
-	hasher := &userHasherFake{
+	hasher := &hasherFake{
 		returnHash: "fake-phc-hash",
 	}
-	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
-	)
+	service := newTestService(fake, hasher, 0, "", 0)
 	email := "test@test.com"
 	password := "test_password"
 
@@ -70,20 +29,20 @@ func TestService_Register_Success(t *testing.T) {
 		t.Fatalf("expected nil, got %v", err)
 	}
 
-	if gotUserID != fake.returnID {
-		t.Fatalf("userId incorrect, want %d, got %d", fake.returnID, gotUserID)
+	if gotUserID != fake.saveUserID {
+		t.Fatalf("userId incorrect, want %d, got %d", fake.saveUserID, gotUserID)
 	}
 
-	if email != fake.gotEmail {
-		t.Fatalf("incorrect email, want %s, got %s", email, fake.gotEmail)
+	if email != fake.gotSaveEmail {
+		t.Fatalf("incorrect email, want %s, got %s", email, fake.gotSaveEmail)
 	}
 
-	if fake.gotPassHash != hasher.returnHash {
+	if fake.gotSavePassHash != hasher.returnHash {
 		t.Fatalf("pass hash does not match")
 	}
 
-	if fake.calls != 1 {
-		t.Fatalf("SaveUser calls = %d, want 1", fake.calls)
+	if fake.saveUserCalls != 1 {
+		t.Fatalf("SaveUser calls = %d, want 1", fake.saveUserCalls)
 	}
 }
 
@@ -103,24 +62,22 @@ func TestService_RegisterInvalidEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake := &userRepositoryFake{
-				returnID: 42,
+			fake := &storageFake{
+				saveUserID: 42,
 			}
-			hasher := &userHasherFake{
+			hasher := &hasherFake{
 				returnHash: "fake-phc-hash",
 			}
-			service := NewService(
-				slog.New(slog.DiscardHandler), fake, hasher, 0, "",
-			)
+			service := newTestService(fake, hasher, 0, "", 0)
 			gotUserID, err := service.Register(context.Background(), tt.email, tt.password)
-			if err == nil {
-				t.Fatalf("expected err %v, got %v", errs.ErrInvalidEmail, err)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected err %v, got %v", tt.want, err)
 			}
 			if gotUserID != 0 {
 				t.Fatalf("expected empty user, got %v", err)
 			}
-			if fake.calls != 0 {
-				t.Fatalf("SaveUser calls = %d, want 0", fake.calls)
+			if fake.saveUserCalls != 0 {
+				t.Fatalf("SaveUser calls = %d, want 0", fake.saveUserCalls)
 			}
 		})
 	}
@@ -128,15 +85,13 @@ func TestService_RegisterInvalidEmail(t *testing.T) {
 
 func TestService_Register_UserAlreadyExists(t *testing.T) {
 	//Arrange
-	fake := &userRepositoryFake{
-		returnErr: errs.ErrUserExists,
+	fake := &storageFake{
+		saveUserErr: errs.ErrUserExists,
 	}
-	hasher := &userHasherFake{
+	hasher := &hasherFake{
 		returnHash: "fake-phc-hash",
 	}
-	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
-	)
+	service := newTestService(fake, hasher, 0, "", 0)
 	email := "test@test.com"
 	password := "test_password"
 
@@ -148,8 +103,8 @@ func TestService_Register_UserAlreadyExists(t *testing.T) {
 		t.Fatalf("Incorrect error, want %v, got %v", errs.ErrUserExists, err)
 	}
 
-	if fake.calls != 1 {
-		t.Fatalf("SaveUser calls = %d, want 1", fake.calls)
+	if fake.saveUserCalls != 1 {
+		t.Fatalf("SaveUser calls = %d, want 1", fake.saveUserCalls)
 	}
 
 	if gotUserID != 0 {
@@ -159,13 +114,11 @@ func TestService_Register_UserAlreadyExists(t *testing.T) {
 
 func TestService_Register_PasswordTooLong(t *testing.T) {
 	//Arrange
-	fake := &userRepositoryFake{}
-	hasher := &userHasherFake{
+	fake := &storageFake{}
+	hasher := &hasherFake{
 		returnHash: "fake-phc-hash",
 	}
-	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
-	)
+	service := newTestService(fake, hasher, 0, "", 0)
 	email := "test@test.com"
 	password := strings.Repeat("a", 129)
 
@@ -175,8 +128,8 @@ func TestService_Register_PasswordTooLong(t *testing.T) {
 		t.Fatalf("Incorrect error, want %v, got %v", errs.ErrPasswordTooLong, err)
 	}
 
-	if fake.calls != 0 {
-		t.Fatalf("SaveUser calls = %d, want 0", fake.calls)
+	if fake.saveUserCalls != 0 {
+		t.Fatalf("SaveUser calls = %d, want 0", fake.saveUserCalls)
 	}
 
 	if gotUserID != 0 {
@@ -186,13 +139,11 @@ func TestService_Register_PasswordTooLong(t *testing.T) {
 
 func TestService_Register_PasswordTooShort(t *testing.T) {
 	//Arrange
-	fake := &userRepositoryFake{}
-	hasher := &userHasherFake{
+	fake := &storageFake{}
+	hasher := &hasherFake{
 		returnHash: "fake-phc-hash",
 	}
-	service := NewService(
-		slog.New(slog.DiscardHandler), fake, hasher, 0, "",
-	)
+	service := newTestService(fake, hasher, 0, "", 0)
 	email := "test@test.com"
 	password := strings.Repeat("a", 11)
 
@@ -202,8 +153,8 @@ func TestService_Register_PasswordTooShort(t *testing.T) {
 		t.Fatalf("Incorrect error, want %v, got %v", errs.ErrPasswordTooShort, err)
 	}
 
-	if fake.calls != 0 {
-		t.Fatalf("SaveUser calls = %d, want 0", fake.calls)
+	if fake.saveUserCalls != 0 {
+		t.Fatalf("SaveUser calls = %d, want 0", fake.saveUserCalls)
 	}
 
 	if gotUserID != 0 {

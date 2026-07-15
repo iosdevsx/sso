@@ -1,6 +1,7 @@
 env: "dev"
 auth:
-  token_ttl: 1h
+  token_ttl: 15m
+  refresh_token_ttl: 720h
 grpc_server:
   port: 44044
   timeout: 4s

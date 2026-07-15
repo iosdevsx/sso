@@ -57,7 +57,7 @@ grpcurl -plaintext -d "{
 
 echo "=== LOGIN ==="
 
-echo "--- 9. Валдиный логин (canonical: регистр/пробелы не мешают) -> token ---"
+echo "--- 9. Валидный логин (canonical: регистр/пробелы не мешают) -> ПАРА token + refresh_token ---"
 grpcurl -plaintext -d '{
   "email": " ALICE+work@Example.com ",
   "password": "correct horse battery staple"
@@ -74,3 +74,26 @@ grpcurl -plaintext -d '{
   "email": "ghost@example.com",
   "password": "correct horse battery staple"
 }' $HOST $SVC/Login
+echo "=== REFRESH-ЦИКЛ (нужен jq) ==="
+
+echo "--- 12. Login -> берём refresh из ответа ---"
+RT=$(grpcurl -plaintext -d '{
+  "email": "alice+work@example.com",
+  "password": "correct horse battery staple"
+}' $HOST $SVC/Login | jq -r .refreshToken)
+echo "got refresh: ${RT:0:8}..."
+
+echo "--- 13. Refresh -> новая пара ---"
+RT2=$(grpcurl -plaintext -d "{\"refresh_token\": \"$RT\"}" $HOST $SVC/Refresh | tee /dev/stderr | jq -r .refreshToken)
+
+echo "--- 14. Повторный Refresh со СТАРЫМ токеном -> Unauthenticated (ротация!) ---"
+grpcurl -plaintext -d "{\"refresh_token\": \"$RT\"}" $HOST $SVC/Refresh
+
+echo "--- 15. Logout с новым токеном -> OK ---"
+grpcurl -plaintext -d "{\"refresh_token\": \"$RT2\"}" $HOST $SVC/Logout
+
+echo "--- 16. Refresh после Logout -> Unauthenticated ---"
+grpcurl -plaintext -d "{\"refresh_token\": \"$RT2\"}" $HOST $SVC/Refresh
+
+echo "--- 17. Повторный Logout мёртвым токеном -> OK (идемпотентность) ---"
+grpcurl -plaintext -d "{\"refresh_token\": \"$RT2\"}" $HOST $SVC/Logout
