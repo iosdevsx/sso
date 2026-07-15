@@ -48,6 +48,8 @@ github.com/ilyakaznacheev/cleanenv v1.5.0 h1:0VNZXggJE2OYdXE87bfSSwGxeiGt9moSR2l
 github.com/ilyakaznacheev/cleanenv v1.5.0/go.mod h1:a5aDzaJrLCQZsazHol1w8InnDcOX0OColm64SlIi6gk=
 github.com/iosdevsx/protos v0.1.0 h1:dmC+rGRsEgaB89vU/5qrMP1dOyzxA3qk7z0dGA5eKnA=
 github.com/iosdevsx/protos v0.1.0/go.mod h1:PZ4Dx0c9H1hGcRq0fbLRLfpANk2GFwBfweVQypLGcp0=
+github.com/iosdevsx/protos v1.0.0 h1:IceJ0d1sJCWiYT6G0/64pT9sagwYod9YZ1UJGC505EY=
+github.com/iosdevsx/protos v1.0.0/go.mod h1:PZ4Dx0c9H1hGcRq0fbLRLfpANk2GFwBfweVQypLGcp0=
 github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa h1:s+4MhCQ6YrzisK6hFJUX53drDT4UsSW3DEhKn0ifuHw=
 github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa/go.mod h1:a/s9Lp5W7n/DD0VrVoyJ00FbP2ytTPDVOivvn2bMlds=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=

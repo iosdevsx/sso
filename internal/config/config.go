@@ -35,8 +35,9 @@ type DBServer struct {
 }
 
 type TokenConfig struct {
-	TokenTTL    time.Duration `yaml:"token_ttl"`
-	TokenSecret string        `env:"SSO_TOKEN_SECRET"`
+	TokenTTL        time.Duration `yaml:"token_ttl"`
+	RefreshTokenTTL time.Duration `yaml:"refresh_token_ttl"`
+	TokenSecret     string        `env:"SSO_TOKEN_SECRET"`
 }
 
 func MustLoad() *Config {

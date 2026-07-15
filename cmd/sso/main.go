@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/iosdevsx/sso/internal/config"
+	"github.com/iosdevsx/sso/internal/domain/errs"
 	authgrpc "github.com/iosdevsx/sso/internal/grpc/auth"
 	"github.com/iosdevsx/sso/internal/lib/hasher"
 	"github.com/iosdevsx/sso/internal/lib/sl"
@@ -48,7 +49,16 @@ func main() {
 	storage := postgres.NewStorage(dbpool)
 	hasher := hasher.New()
 	grpcServer := grpc.NewServer()
-	service := authservice.NewService(logger, storage, hasher, cfg.Auth.TokenTTL, cfg.Auth.TokenSecret)
+
+	service := authservice.NewService(authservice.ServiceParams{
+		Log:             logger,
+		UserStorage:     storage,
+		TokenStorage:    storage,
+		PassHasher:      hasher,
+		TokenTTL:        cfg.Auth.TokenTTL,
+		TokenSecret:     cfg.Auth.TokenSecret,
+		RefreshTokenTTL: cfg.Auth.RefreshTokenTTL,
+	})
 
 	authgrpc.Register(logger, grpcServer, service)
 	reflection.Register(grpcServer)
@@ -86,28 +96,34 @@ func setupLogger(env string) *slog.Logger {
 }
 
 func setupStorage(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	const (
+		migration    = "operation.migrations.run"
+		parseConfig  = "operation.config.parse"
+		poolCreation = "operation.pool.create"
+		poolPing     = "operation.pool.ping"
+	)
 	dbUrl := cfg.DBServer.DatabaseURL()
 	err := migrations.Run(dbUrl)
 
 	if err != nil {
-		return nil, fmt.Errorf("migrations run failed: %w", err)
+		return nil, errs.Wrap(migration, err)
 	}
 
 	dbConfig, err := pgxpool.ParseConfig(dbUrl)
 
 	if err != nil {
-		return nil, fmt.Errorf("parse config failed: %w", err)
+		return nil, errs.Wrap(parseConfig, err)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 
 	if err != nil {
-		return nil, fmt.Errorf("pool creation failed: %w", err)
+		return nil, errs.Wrap(poolCreation, err)
 	}
 
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("pool ping failed: %w", err)
+		return nil, errs.Wrap(poolPing, err)
 	}
 
 	return pool, nil
