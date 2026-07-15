@@ -114,3 +114,59 @@ func (s *Storage) ConsumeRefreshToken(ctx context.Context, tokenHash string) (in
 
 	return userID, nil
 }
+
+func (s *Storage) IncrementFailedLoginAttempt(ctx context.Context, userID int64, maxAttempts int, lockUntil time.Time) (*time.Time, error) {
+	const operation = "storage.postgres.incrementFailedLoginAttempt"
+	const query = `
+		insert into login_attempts (user_id) 
+		values($1) 
+		on conflict (user_id) 
+		do update set 
+		count=least(login_attempts.count + 1, $2),
+		locked_until=case when least(login_attempts.count + 1, $2) >= $2
+		then $3
+		else login_attempts.locked_until end
+		returning locked_until
+	`
+	var lockedUntil *time.Time
+	err := s.pool.QueryRow(ctx, query, userID, maxAttempts, lockUntil).Scan(&lockedUntil)
+
+	if err != nil {
+		return nil, errs.Wrap(operation, err)
+	}
+
+	return lockedUntil, nil
+}
+
+func (s *Storage) CheckAccountLock(ctx context.Context, userID int64) (*time.Time, error) {
+	const operation = "storage.postgres.checkAccountLock"
+	const query = `
+		select locked_until from login_attempts where user_id = $1
+	`
+	var locked *time.Time
+	err := s.pool.QueryRow(ctx, query, userID).Scan(&locked)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, errs.Wrap(operation, err)
+	}
+
+	return locked, nil
+}
+
+func (s *Storage) ResetAccountAttempts(ctx context.Context, userID int64) error {
+	const operation = "storage.postgres.resetAccountAttempts"
+	const query = `
+		delete from login_attempts where user_id = $1
+	`
+	_, err := s.pool.Exec(ctx, query, userID)
+
+	if err != nil {
+		return errs.Wrap(operation, err)
+	}
+
+	return nil
+}

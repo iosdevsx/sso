@@ -15,6 +15,7 @@ var (
 	ErrUserNotFound         = errors.New("user not found")
 	ErrInvalidRefreshToken  = errors.New("invalid refresh token")
 	ErrRefreshTokenNotFound = errors.New("refresh token not found")
+	ErrTooManyAttempts      = errors.New("too many attempts")
 )
 
 func Wrap(operation string, err error) error {

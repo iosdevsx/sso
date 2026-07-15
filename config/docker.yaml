@@ -2,6 +2,8 @@ env: "dev"
 auth:
   token_ttl: 15m
   refresh_token_ttl: 720h
+  max_login_attempts: 5
+  lockout_duration: 15m
 grpc_server:
   port: 44044
   timeout: 4s

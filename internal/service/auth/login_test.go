@@ -180,3 +180,119 @@ func TestService_Login_BrokenHashIsInternal(t *testing.T) {
 		t.Fatalf("tokens must be empty, got %+v", tokens)
 	}
 }
+
+func TestService_Login_LockedAccount(t *testing.T) {
+	//Arrange: активная блокировка
+	future := time.Now().Add(10 * time.Minute)
+	fake := &storageFake{
+		getUserUser:   models.User{ID: 8, PassHash: "stored-phc-hash"},
+		checkLockTime: &future,
+	}
+	hasher := &hasherFake{verifyOK: true} // пароль ВЕРНЫЙ — всё равно отказ
+	service := newTestService(fake, hasher, time.Hour, "s", time.Hour)
+
+	//Act
+	tokens, err := service.Login(context.Background(), "test@test.com", strings.Repeat("a", 12))
+
+	//Assert
+	if !errors.Is(err, errs.ErrTooManyAttempts) {
+		t.Fatalf("err = %v, want ErrTooManyAttempts", err)
+	}
+	if tokens.AccessToken != "" || tokens.RefreshToken != "" {
+		t.Fatalf("tokens must be empty, got %+v", tokens)
+	}
+	if hasher.verifyCalls != 0 {
+		t.Fatalf("Verify calls = %d, want 0: заблокированный аккаунт не тратит Argon2", hasher.verifyCalls)
+	}
+	if fake.resetCalls != 0 {
+		t.Fatalf("Reset calls = %d, want 0", fake.resetCalls)
+	}
+}
+
+func TestService_Login_ExpiredLockAllowsLogin(t *testing.T) {
+	//Arrange: блокировка в прошлом — юзер снова допущен
+	past := time.Now().Add(-time.Minute)
+	fake := &storageFake{
+		getUserUser:   models.User{ID: 8, PassHash: "stored-phc-hash"},
+		checkLockTime: &past,
+	}
+	hasher := &hasherFake{verifyOK: true}
+	service := newTestService(fake, hasher, time.Hour, "s", time.Hour)
+
+	//Act
+	tokens, err := service.Login(context.Background(), "test@test.com", strings.Repeat("a", 12))
+
+	//Assert
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+		t.Fatalf("expected token pair, got %+v", tokens)
+	}
+	if fake.resetCalls != 1 {
+		t.Fatalf("Reset calls = %d, want 1: успех сбрасывает счётчик", fake.resetCalls)
+	}
+}
+
+func TestService_Login_FailureThatLocksReturnsTooManyAttempts(t *testing.T) {
+	//Arrange: неверный пароль, и инкремент сообщил «теперь заблокирован»
+	future := time.Now().Add(15 * time.Minute)
+	fake := &storageFake{
+		getUserUser:       models.User{ID: 8, PassHash: "stored-phc-hash"},
+		incrementLockTime: &future,
+	}
+	hasher := &hasherFake{verifyOK: false}
+	service := newTestService(fake, hasher, time.Hour, "s", time.Hour)
+
+	//Act
+	_, err := service.Login(context.Background(), "test@test.com", strings.Repeat("a", 12))
+
+	//Assert
+	if !errors.Is(err, errs.ErrTooManyAttempts) {
+		t.Fatalf("err = %v, want ErrTooManyAttempts", err)
+	}
+	if fake.incrementCalls != 1 {
+		t.Fatalf("Increment calls = %d, want 1", fake.incrementCalls)
+	}
+}
+
+func TestService_Login_FailureBeforeLockIsInvalidCredentials(t *testing.T) {
+	//Arrange: неверный пароль, лимит ещё не исчерпан (инкремент вернул nil)
+	fake := &storageFake{
+		getUserUser: models.User{ID: 8, PassHash: "stored-phc-hash"},
+	}
+	hasher := &hasherFake{verifyOK: false}
+	service := newTestService(fake, hasher, time.Hour, "s", time.Hour)
+
+	//Act
+	_, err := service.Login(context.Background(), "test@test.com", strings.Repeat("a", 12))
+
+	//Assert
+	if !errors.Is(err, errs.ErrInvalidCredentials) {
+		t.Fatalf("err = %v, want ErrInvalidCredentials", err)
+	}
+	if fake.incrementCalls != 1 {
+		t.Fatalf("Increment calls = %d, want 1", fake.incrementCalls)
+	}
+}
+
+func TestService_Login_ResetFailureStillLogsIn(t *testing.T) {
+	//Arrange: пароль верный, сброс счётчика упал — юзер не должен страдать
+	fake := &storageFake{
+		getUserUser: models.User{ID: 8, PassHash: "stored-phc-hash"},
+		resetErr:    errors.New("db connection lost"),
+	}
+	hasher := &hasherFake{verifyOK: true}
+	service := newTestService(fake, hasher, time.Hour, "s", time.Hour)
+
+	//Act
+	tokens, err := service.Login(context.Background(), "test@test.com", strings.Repeat("a", 12))
+
+	//Assert
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+		t.Fatalf("expected token pair, got %+v", tokens)
+	}
+}

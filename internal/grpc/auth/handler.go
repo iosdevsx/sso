@@ -59,6 +59,8 @@ func (s *handler) Login(ctx context.Context, request *ssov1.LoginRequest) (*ssov
 		switch {
 		case errors.Is(err, errs.ErrInvalidCredentials):
 			return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+		case errors.Is(err, errs.ErrTooManyAttempts):
+			return nil, status.Error(codes.ResourceExhausted, "too many attempts")
 		default:
 			s.logger.Error("internal server error", sl.Err(err))
 			return nil, status.Error(codes.Internal, "internal server error")
