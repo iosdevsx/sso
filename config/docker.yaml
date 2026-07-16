@@ -12,3 +12,6 @@ db_server:
   host: "postgres"
   port: "5432"
   sslmode: "disable"
+token_cleaner:
+  interval: 1h
+  retention: 720h

@@ -170,3 +170,18 @@ func (s *Storage) ResetAccountAttempts(ctx context.Context, userID int64) error 
 
 	return nil
 }
+
+func (s *Storage) DeleteExpiredRefreshTokens(ctx context.Context, retention time.Duration) (int64, error) {
+	const operation = "storage.postgres.deleteExpiredRefreshTokens"
+	const query = `
+		delete from refresh_tokens where expires_at < $1
+	`
+	cutoff := time.Now().Add(-retention)
+
+	commandTag, err := s.pool.Exec(ctx, query, cutoff)
+
+	if err != nil {
+		return 0, errs.Wrap(operation, err)
+	}
+	return commandTag.RowsAffected(), nil
+}
