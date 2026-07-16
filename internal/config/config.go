@@ -12,10 +12,11 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Env      string     `yaml:"env"`
-	GRPC     GRPCConfig `yaml:"grpc_server"`
-	DBServer DBServer   `yaml:"db_server"`
-	Auth     AuthConfig `yaml:"auth"`
+	Env      string       `yaml:"env"`
+	GRPC     GRPCConfig   `yaml:"grpc_server"`
+	DBServer DBServer     `yaml:"db_server"`
+	Auth     AuthConfig   `yaml:"auth"`
+	Cleaner  TokenCleaner `yaml:"token_cleaner"`
 }
 
 type GRPCConfig struct {
@@ -40,6 +41,11 @@ type AuthConfig struct {
 	TokenSecret     string        `env:"SSO_TOKEN_SECRET"`
 	MaxAttempts     int           `yaml:"max_login_attempts"`
 	LockoutDuration time.Duration `yaml:"lockout_duration"`
+}
+
+type TokenCleaner struct {
+	Interval  time.Duration `yaml:"interval"`
+	Retention time.Duration `yaml:"retention"`
 }
 
 func MustLoad() *Config {
