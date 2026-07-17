@@ -105,5 +105,4 @@ migrations/         golang-migrate, применяются на старте
 - Подтверждение email — контракт готов, реализация отложена.
 - Anti-enumeration: `Register` честно отвечает `AlreadyExists`.
 - Отзыв access-токенов до истечения (JWT stateless, TTL короткий).
-- Уборка истёкших refresh-токенов — появится вместе с graceful shutdown.
 - `app_id`/audience — до появления второго приложения-потребителя.
