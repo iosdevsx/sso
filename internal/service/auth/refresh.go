@@ -12,11 +12,13 @@ import (
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (models.Tokens, error) {
 	const operation = "service.auth.refresh"
+	rawRefresh, newRefreshHash, err := newRefreshToken()
+	if err != nil {
+		return models.Tokens{}, errs.Wrap(operation, err)
+	}
+	exp := time.Now().Add(s.authParams.RefreshTokenTTL)
 
-	userID, err := s.tokenStorage.ConsumeRefreshToken(
-		ctx,
-		hashRefresh(refreshToken),
-	)
+	userID, err := s.tokenStorage.RotateRefreshToken(ctx, hashRefresh(refreshToken), newRefreshHash, exp)
 
 	if errors.Is(err, errs.ErrRefreshTokenNotFound) {
 		return models.Tokens{}, errs.Wrap(operation, errs.ErrInvalidRefreshToken)
@@ -26,19 +28,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (models.Toke
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}
 
-	rawRefresh, hashRefreshToken, err := newRefreshToken()
-
-	if err != nil {
-		return models.Tokens{}, errs.Wrap(operation, err)
-	}
-
-	exp := time.Now().Add(s.authParams.RefreshTokenTTL)
-	err = s.tokenStorage.SaveRefreshToken(ctx, userID, hashRefreshToken, exp)
-
-	if err != nil {
-		return models.Tokens{}, errs.Wrap(operation, err)
-	}
-
+	//Generate new access_token
 	accessToken, err := jwt.NewToken(userID, s.authParams.TokenTTL, s.authParams.TokenSecret)
 
 	if err != nil {

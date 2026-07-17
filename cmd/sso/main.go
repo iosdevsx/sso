@@ -92,11 +92,12 @@ func main() {
 	go func() {
 		if err := grpcServer.Serve(listener); err != nil {
 			logger.Error("grpc server failed", sl.Err(err))
+			stop()
 		}
 	}()
 
 	<-ctx.Done()
-	logger.Info("shutdow received")
+	logger.Info("shutdown received")
 
 	done := make(chan struct{})
 	go func() {

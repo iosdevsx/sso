@@ -57,6 +57,14 @@ type storageFake struct {
 	consumeCalls   int
 	gotConsumeHash string
 
+	// RotateRefreshToken
+	rotateUserID     int64
+	rotateErr        error
+	rotateCalls      int
+	gotRotateOldHash string
+	gotRotateNewHash string
+	gotRotateExp     time.Time
+
 	// CheckAccountLock
 	checkLockTime  *time.Time
 	checkLockErr   error
@@ -114,6 +122,19 @@ func (f *storageFake) ConsumeRefreshToken(ctx context.Context, tokenHash string)
 	f.consumeCalls++
 	f.gotConsumeHash = tokenHash
 	return f.consumeUserID, f.consumeErr
+}
+
+func (f *storageFake) RotateRefreshToken(
+	ctx context.Context,
+	oldRefreshTokenHash string,
+	newRefreshTokenHash string,
+	expiresAt time.Time,
+) (int64, error) {
+	f.rotateCalls++
+	f.gotRotateOldHash = oldRefreshTokenHash
+	f.gotRotateNewHash = newRefreshTokenHash
+	f.gotRotateExp = expiresAt
+	return f.rotateUserID, f.rotateErr
 }
 
 // hasherFake реализует PassHasher с явно управляемыми результатами.

@@ -21,6 +21,22 @@ func NewStorage(pool *pgxpool.Pool) *Storage {
 	return &Storage{pool: pool}
 }
 
+const (
+	consumeRefreshToken = `
+		update refresh_tokens 
+		set revoked_at=current_timestamp 
+		where token_hash = $1 and revoked_at is null and expires_at > now()
+		returning user_id
+	`
+	saveRefreshToken = `
+		insert into refresh_tokens(
+			user_id, token_hash, expires_at
+		) values(
+			$1, $2, $3
+		)	
+	`
+)
+
 func (s *Storage) SaveUser(ctx context.Context, email string, passHash string) (int64, error) {
 	const operation = "storage.postgres.saveUser"
 	const query = `
@@ -76,14 +92,8 @@ func (s *Storage) GetUser(ctx context.Context, email string) (models.User, error
 
 func (s *Storage) SaveRefreshToken(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time) error {
 	const operation = "storage.postgres.saveRefreshToken"
-	const query = `
-		insert into refresh_tokens(
-			user_id, token_hash, expires_at
-		) values(
-			$1, $2, $3
-		)	
-	`
-	_, err := s.pool.Exec(ctx, query, userID, tokenHash, expiresAt)
+
+	_, err := s.pool.Exec(ctx, saveRefreshToken, userID, tokenHash, expiresAt)
 
 	if err != nil {
 		return errs.Wrap(operation, err)
@@ -94,15 +104,9 @@ func (s *Storage) SaveRefreshToken(ctx context.Context, userID int64, tokenHash 
 
 func (s *Storage) ConsumeRefreshToken(ctx context.Context, tokenHash string) (int64, error) {
 	const operation = "storage.postgres.consumeRefreshToken"
-	const query = `
-		update refresh_tokens 
-		set revoked_at=current_timestamp 
-		where token_hash = $1 and revoked_at is null and expires_at > now()
-		returning user_id
-	`
 
 	var userID int64
-	err := s.pool.QueryRow(ctx, query, tokenHash).Scan(&userID)
+	err := s.pool.QueryRow(ctx, consumeRefreshToken, tokenHash).Scan(&userID)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, errs.Wrap(operation, errs.ErrRefreshTokenNotFound)
@@ -184,4 +188,43 @@ func (s *Storage) DeleteExpiredRefreshTokens(ctx context.Context, retention time
 		return 0, errs.Wrap(operation, err)
 	}
 	return commandTag.RowsAffected(), nil
+}
+
+func (s *Storage) RotateRefreshToken(
+	ctx context.Context,
+	oldRefreshTokenHash string,
+	newRefreshTokenHash string,
+	expiresAt time.Time,
+) (int64, error) {
+	const operation = "storage.postgres.rotateRefreshToken"
+	tx, err := s.pool.Begin(ctx)
+
+	if err != nil {
+		return 0, errs.Wrap(operation, err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	var userID int64
+	consumeErr := tx.QueryRow(ctx, consumeRefreshToken, oldRefreshTokenHash).Scan(&userID)
+
+	if errors.Is(consumeErr, pgx.ErrNoRows) {
+		return 0, errs.Wrap(operation, errs.ErrRefreshTokenNotFound)
+	}
+
+	if consumeErr != nil {
+		return 0, errs.Wrap(operation, consumeErr)
+	}
+
+	_, saveErr := tx.Exec(ctx, saveRefreshToken, userID, newRefreshTokenHash, expiresAt)
+
+	if saveErr != nil {
+		return 0, errs.Wrap(operation, saveErr)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, errs.Wrap(operation, err)
+	}
+
+	return userID, nil
 }

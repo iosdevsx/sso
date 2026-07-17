@@ -16,6 +16,12 @@ type UserStorage interface {
 type TokenStorage interface {
 	SaveRefreshToken(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time) error
 	ConsumeRefreshToken(ctx context.Context, tokenHash string) (int64, error)
+	RotateRefreshToken(
+		ctx context.Context,
+		oldRefreshTokenHash string,
+		newRefreshTokenHash string,
+		expiresAt time.Time,
+	) (int64, error)
 }
 
 type LoginAttemptsStorage interface {
