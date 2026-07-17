@@ -1,5 +1,5 @@
 #build stage
-FROM golang:alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -10,11 +10,14 @@ COPY . .
 RUN go build -o sso ./cmd/sso
 
 #final stage
-FROM alpine:latest
+FROM alpine:3.24
 WORKDIR /app
 
 COPY --from=builder /app/sso .
 COPY --from=builder /app/config ./config
+
+RUN adduser -D -u 10001 appusr
+USER appusr
 
 ENV CONFIG_PATH=config/docker.yaml
 
