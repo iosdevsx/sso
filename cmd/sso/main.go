@@ -22,6 +22,7 @@ import (
 	"github.com/iosdevsx/sso/internal/storage/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -73,10 +74,19 @@ func main() {
 		},
 	})
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(timeoutInterceptor(cfg.GRPC.Timeout)),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: cfg.GRPC.IdleTimeout,
+		}),
+	)
+
 	authgrpc.Register(logger, grpcServer, service)
-	reflection.Register(grpcServer)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+
+	if cfg.Env != prod {
+		reflection.Register(grpcServer)
+	}
 
 	var wg sync.WaitGroup
 
@@ -174,4 +184,12 @@ func setupStorage(ctx context.Context, logger *slog.Logger, cfg *config.Config) 
 	logger.Info("Storage initialized", slog.String("env", cfg.Env))
 	storage := postgres.NewStorage(pool)
 	return storage, pool, nil
+}
+
+func timeoutInterceptor(timeout time.Duration) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		return handler(ctx, req)
+	}
 }

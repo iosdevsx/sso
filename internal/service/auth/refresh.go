@@ -13,9 +13,11 @@ import (
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (models.Tokens, error) {
 	const operation = "service.auth.refresh"
 	rawRefresh, newRefreshHash, err := newRefreshToken()
+
 	if err != nil {
 		return models.Tokens{}, errs.Wrap(operation, err)
 	}
+
 	exp := time.Now().Add(s.authParams.RefreshTokenTTL)
 
 	userID, err := s.tokenStorage.RotateRefreshToken(ctx, hashRefresh(refreshToken), newRefreshHash, exp)

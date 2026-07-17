@@ -64,6 +64,21 @@ type Service struct {
 func NewService(
 	params ServiceParams,
 ) *Service {
+	if params.Log == nil {
+		panic("auth: ServiceParams.Log is required")
+	}
+	if params.UserStorage == nil {
+		panic("auth: ServiceParams.UserStorage is required")
+	}
+	if params.TokenStorage == nil {
+		panic("auth: ServiceParams.TokenStorage is required")
+	}
+	if params.LoginAttemptsStorage == nil {
+		panic("auth: ServiceParams.LoginAttemptsStorage is required")
+	}
+	if params.PassHasher == nil {
+		panic("auth: ServiceParams.PassHasher is required")
+	}
 	return &Service{
 		log:                  params.Log,
 		userStorage:          params.UserStorage,
