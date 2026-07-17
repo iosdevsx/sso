@@ -1,4 +1,5 @@
 # SSO
+[![sso-ci](https://github.com/iosdevsx/sso/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/iosdevsx/sso/actions/workflows/go.yml)
 
 gRPC-сервис регистрации и аутентификации. Выдаёт пару access (JWT) + refresh
 token, умеет ротацию refresh-токенов, logout и защиту от перебора паролей.
