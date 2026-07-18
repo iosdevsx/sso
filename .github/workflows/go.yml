@@ -26,3 +26,6 @@ jobs:
 
     - name: Test
       run: go test -v -race ./...
+    
+    - name: IntegrationTest
+      run: go test -tags=integration -v ./internal/storage/postgres/
