@@ -19,7 +19,6 @@ func (f *deleterFake) DeleteExpiredRefreshTokens(ctx context.Context, retention 
 	return 0, f.returnErr
 }
 
-// Уборщик тикает и останавливается по отмене контекста, не подвисая.
 func TestTokenCleanWorker_RunsAndStopsOnCancel(t *testing.T) {
 	fake := &deleterFake{}
 	w := NewTokenCleaner(slog.New(slog.DiscardHandler), fake, 10*time.Millisecond, time.Hour)
@@ -31,13 +30,11 @@ func TestTokenCleanWorker_RunsAndStopsOnCancel(t *testing.T) {
 		close(stopped)
 	}()
 
-	// даём натикать несколько прогонов
 	time.Sleep(60 * time.Millisecond)
 	cancel()
 
 	select {
 	case <-stopped:
-		// вышел — хорошо
 	case <-time.After(time.Second):
 		t.Fatal("Run did not stop within 1s after cancel")
 	}
@@ -47,7 +44,6 @@ func TestTokenCleanWorker_RunsAndStopsOnCancel(t *testing.T) {
 	}
 }
 
-// Ошибка одного прогона не убивает цикл — уборщик продолжает тикать.
 func TestTokenCleanWorker_SurvivesCleanupError(t *testing.T) {
 	fake := &deleterFake{returnErr: errors.New("db connection lost")}
 	w := NewTokenCleaner(slog.New(slog.DiscardHandler), fake, 10*time.Millisecond, time.Hour)
